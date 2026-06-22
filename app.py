@@ -7,7 +7,8 @@ import threading
 import hashlib
 import html
 import requests
-import serial  # Required for Arduino hardware integration
+import serial
+import serial.tools.list_ports
 from collections import OrderedDict
 from datetime import date, datetime, timezone
 from dotenv import load_dotenv
@@ -38,8 +39,6 @@ OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/chat")
 # ── ARDUINO SERIAL SETUP ──────────────────────────────────────
 def _find_arduino_port() -> str | None:
     """Try the env-specified port first, then scan all COM ports for an Arduino."""
-    import serial.tools.list_ports
-
     env_port = os.getenv("ARDUINO_PORT", "")
     candidates = []
 
