@@ -36,14 +36,43 @@ CREWAI_STATUS_URL  = f"{CREWAI_CREW_URL}/status/{{kickoff_id}}" if CREWAI_CREW_U
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/chat")
 
 # ── ARDUINO SERIAL SETUP ──────────────────────────────────────
-ARDUINO_PORT = os.getenv("ARDUINO_PORT", "COM3")
-try:
-    arduino = serial.Serial(port=ARDUINO_PORT, baudrate=9600, timeout=1)
-    time.sleep(2) # Allow board to safely reset after handshake
-    log.info(f"🔌 [HARDWARE] Connected successfully on {ARDUINO_PORT}.")
-except Exception as e:
-    arduino = None
-    log.warning(f"⚠️ [HARDWARE] Microcontroller not found on {ARDUINO_PORT}. Software-only mode enabled: {e}")
+def _find_arduino_port() -> str | None:
+    """Try the env-specified port first, then scan all COM ports for an Arduino."""
+    import serial.tools.list_ports
+
+    env_port = os.getenv("ARDUINO_PORT", "")
+    candidates = []
+
+    if env_port:
+        candidates.append(env_port)
+
+    # Append any port whose description mentions Arduino/CH340/CP210x
+    for p in serial.tools.list_ports.comports():
+        desc = (p.description or "").lower()
+        if any(kw in desc for kw in ("arduino", "ch340", "cp210", "usb serial")):
+            if p.device not in candidates:
+                candidates.append(p.device)
+
+    # Fall back to scanning every COM port
+    for p in serial.tools.list_ports.comports():
+        if p.device not in candidates:
+            candidates.append(p.device)
+
+    log.info(f"[HARDWARE] Port candidates to try: {candidates}")
+    for port in candidates:
+        try:
+            conn = serial.Serial(port=port, baudrate=9600, timeout=1)
+            time.sleep(2)  # Allow board to safely reset after handshake
+            log.info(f"🔌 [HARDWARE] Connected successfully on {port}.")
+            return conn
+        except Exception as e:
+            log.debug(f"[HARDWARE] {port} failed: {e}")
+
+    return None
+
+arduino = _find_arduino_port()
+if arduino is None:
+    log.warning("⚠️ [HARDWARE] No Arduino found on any port. Software-only mode enabled.")
 
 def send_hardware_signal(newsletter_text: str) -> str:
     """Reads the AI's triage tag, triggers hardware, and removes the tag from the text."""
