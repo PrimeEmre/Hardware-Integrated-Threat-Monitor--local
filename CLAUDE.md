@@ -13,6 +13,8 @@ pip install flask requests python-dotenv pyserial duckduckgo-search
 python app.py
 ```
 
+`duckduckgo-search` installs as the `ddgs` package (imported via `from ddgs import DDGS`).
+
 App runs at `http://localhost:5000` (port overridable via `PORT` env var). Set `FLASK_DEBUG=1` for debug mode.
 
 ## Environment Variables (`.env`)
@@ -40,7 +42,11 @@ App runs at `http://localhost:5000` (port overridable via `PORT` env var). Set `
 
 **Hardware signal protocol**: Arduino (`threat_monitor.ino`) listens at 9600 baud. Byte `C` → red LED (pin 9), byte `O` → green LED (pin 10).
 
-**Frontend** (`static/script.js`): Vanilla JS. Calls `/generate-briefing` (POST) and `/api/test-hardware` (GET). Renders Markdown with `marked.js`. UI LED strip and LCD widget mirror hardware state.
+**Frontend** ([static/script.js](static/script.js)): Vanilla JS. Calls `/generate-briefing` (POST) and `/api/test-hardware` (GET). Renders Markdown with `marked.js`. UI LED strip and LCD widget mirror hardware state.
+
+**Rate limiter**: In-memory, IP-keyed, 10 req/60 s. Applied via `@app.before_request` to all `/api/*` and `/generate-briefing` routes. Resets on server restart — not shared across workers.
+
+**Threading**: Flask runs with `threaded=True`. The `LRUCache` and `RateLimiter` classes use `threading.Lock` for safety. The Arduino `serial.Serial` object is a module-level singleton; concurrent writes are not locked, so only one request should write to serial at a time in practice.
 
 ## Key API Endpoints
 
